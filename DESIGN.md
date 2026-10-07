@@ -59,12 +59,18 @@ early lucky win doesn't stick forever.
   aggregation uses weights (§3.4).
 
 ### 3.2 Confidence ("Qué tan seguro está tu rankeo")
-For each adjacent pair in the ranking, P(order is right) ≈ Φ(Δθ / √(σᵢ²+σⱼ²)).
-Ranking confidence = mean over adjacent pairs, rescaled from [0.5, 1] to
-[0 %, 100 %]. Adjacent pairs are the hardest ones to get right, so this
-is a conservative number that moves visibly as you vote. It's shown as a
-progress bar on the duel screen, so it doubles as "how much more should I
-play".
+For every pair of items, P(order is right) ≈ Φ(|Δθ| / √(σᵢ²+σⱼ²)).
+Ranking confidence = the mean over all pairs, rescaled from [0.5, 1] to
+[0 %, 100 %]. That is roughly the expected Kendall τ between the shown ranking and
+your "true" one. It's shown as a progress bar on the duel screen, with toasts
+at 50/75/90 %, so it doubles as "how much more should I play".
+
+The first version averaged **adjacent pairs only**, which sounded rigorous.
+Measured with a simulated perfect voter, it read 32 % after 8 duels per item
+on 30 items, so the 75 %/90 % milestones were unreachable and the bar felt
+broken. The all-pairs mean (perfect voter, 12 items) reads 58 % at 2 duels per
+item, 78 % at 4 and 92 % at 8. That is still conservative next to the measured τ
+in §3.3, which is the right direction for a progress bar.
 
 ### 3.3 Choosing the next duel (active learning)
 Random pairs waste most of the user's clicks on obvious matchups
@@ -199,9 +205,9 @@ them.
   recovery of a hidden true order from simulated noisy voters.
 - [x] **M2 Backend.** Schema, auth, groups + invites, lists, items, votes,
   undo, exclusions, ranking endpoints. API tests against an in-memory DB.
-- [ ] **M3 Frontend core.** Auth, home, create list (paste items), duel
+- [x] **M3 Frontend core.** Auth, home, create list (paste items), duel
   screen (keyboard, undo, tie/skip/exclude, confidence bar), personal ranking.
-- [ ] **M4 Groups.** Group pages, invite links, group ranking, insights,
+- [x] **M4 Groups.** Group pages, invite links, group ranking, insights,
   tier view.
 - [ ] **M5 Ship.** Dockerfile + Railway config, deploy instructions, polish.
 
@@ -213,7 +219,13 @@ them.
 - API: `node:test` integration tests that boot the Hono app against an
   in-memory SQLite DB and exercise auth, authorization boundaries, voting,
   undo and group aggregation.
-- Frontend: checked by hand in a browser (no automated UI tests in v1).
+- Frontend: no automated UI tests in v1. Checked by driving the production
+  build in headless Chrome (Playwright script, kept outside the repo):
+  two users, invite link, 30 keyboard duels, undo, ranking/tier views,
+  mobile viewport, group tab, item editing. That run found four bugs that unit
+  tests couldn't: stale member names after a friend joins, a misleading
+  "votes weigh less" note at weight 0.93, "alma gemela" shown with only one
+  peer, and the too-harsh confidence metric (§3.2).
 
 ## 7. Known limits / future work
 - Rankings are recomputed per request. If lists reach thousands of items or
@@ -227,6 +239,7 @@ them.
 
 ## 8. Decision log
 - 2026-10-06: Initial design (this document).
+- 2026-10-06: Confidence switched from adjacent-pairs to all-pairs (§3.2) after browser testing showed 24 % after 30 perfect picks.
 - 2026-10-06: Tiers switched from largest-gap cuts to Jenks natural breaks (§3.6).
 - 2026-10-06: Dropped `concurrently` (critical advisory in its `shell-quote`
   dependency) for a 10-line `scripts/dev.mjs`.

@@ -139,19 +139,22 @@ export function sortFits(fits: readonly ItemFit[]): ItemFit[] {
 }
 
 /**
- * Ranking confidence in [0, 1]: mean probability that each adjacent pair is
- * in the right order, rescaled from [0.5, 1]. See DESIGN.md §3.2.
+ * Ranking confidence in [0, 1]: the mean, over all pairs, of the probability
+ * that the pair is in the right order, rescaled from [0.5, 1]. That is roughly the
+ * expected Kendall τ between this ranking and the user's "true" one.
+ * See DESIGN.md §3.2 for why not adjacent pairs only.
  */
 export function rankingConfidence(fits: readonly ItemFit[]): number {
   if (fits.length < 2) return fits.length === 1 ? 1 : 0;
-  const sorted = sortFits(fits);
   let total = 0;
-  for (let k = 0; k + 1 < sorted.length; k++) {
-    const x = sorted[k]!;
-    const y = sorted[k + 1]!;
-    const sd = Math.sqrt(x.sigma ** 2 + y.sigma ** 2);
-    total += Number.isFinite(sd) && sd > 0 ? normalCdf((x.theta - y.theta) / sd) : 0.5;
+  for (let i = 0; i < fits.length; i++) {
+    for (let j = i + 1; j < fits.length; j++) {
+      const x = fits[i]!;
+      const y = fits[j]!;
+      const sd = Math.sqrt(x.sigma ** 2 + y.sigma ** 2);
+      total += Number.isFinite(sd) && sd > 0 ? normalCdf(Math.abs(x.theta - y.theta) / sd) : 0.5;
+    }
   }
-  const mean = total / (sorted.length - 1);
+  const mean = total / ((fits.length * (fits.length - 1)) / 2);
   return Math.max(0, Math.min(1, (mean - 0.5) * 2));
 }

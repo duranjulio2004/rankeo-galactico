@@ -109,6 +109,20 @@ describe('Bradley–Terry fit', () => {
     assert.ok(cMany > 0.8);
   });
 
+  test('confidence milestones are reachable: a perfect voter passes 75% within 5 duels per item', () => {
+    const rng = seededRng(1);
+    const items = ids(12);
+    const votes: Vote[] = [];
+    const counts = new Map<string, number>();
+    for (let k = 0; k < 5 * 12; k++) {
+      const p = selectPair({ fits: fitBradleyTerry(items, votes), pairCounts: counts, rng })!;
+      votes.push({ a: p.left, b: p.right, result: p.left < p.right ? 1 : 0 });
+      counts.set(pairKey(p.left, p.right), (counts.get(pairKey(p.left, p.right)) ?? 0) + 1);
+    }
+    const c = rankingConfidence(fitBradleyTerry(items, votes));
+    assert.ok(c > 0.75 && c < 0.97, `confidence ${c.toFixed(3)}`);
+  });
+
   test('rating scale is Elo-like', () => {
     assert.equal(toRating(0), 1500);
     assert.equal(toRating(Math.LN10), 1900);
