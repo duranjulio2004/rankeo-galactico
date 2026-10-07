@@ -12,7 +12,7 @@ const TEMPLATES: { title: string; emoji: string; items: string }[] = [
   {
     title: 'Snacks del kiosko',
     emoji: '🍫',
-    items: ['🍫 Super 8', '🍫 Sahne-Nuss', '🍪 Tritón', '🍪 Frac', '🍪 Chocman', '🍬 Negrita', '🍫 Trencito', '🥨 Ramitas', '🥔 Papas Lays', '🍬 Ambrosoli', '🍪 Morocha', '🍫 Costa Rama'].join('\n'),
+    items: ['Super 8', 'Sahne-Nuss', 'Tritón', 'Frac', 'Chocman', 'Negrita', 'Trencito', 'Ramitas', 'Papas Lays', 'Ambrosoli', 'Morocha', 'Costa Rama'].join('\n'),
   },
   {
     title: 'Películas de Pixar',
