@@ -209,7 +209,9 @@ them.
   screen (keyboard, undo, tie/skip/exclude, confidence bar), personal ranking.
 - [x] **M4 Groups.** Group pages, invite links, group ranking, insights,
   tier view.
-- [ ] **M5 Ship.** Dockerfile + Railway config, deploy instructions, polish.
+- [x] **M5 Ship.** Dockerfile + Railway config, deploy instructions. The container
+  was built and run locally with a volume, and data survives a restart. Not deployed (needs the
+  owner's Railway login).
 
 ## 6. Testing strategy
 - Ranking engine: deterministic unit tests (seeded RNG), plus simulation
@@ -236,6 +238,12 @@ them.
   model as weak pairwise evidence).
 - Public share links for a read-only ranking/tier image.
 - Single process + SQLite: no horizontal scaling. Fine for the target users.
+- Login rate limiting keys on username + client IP. Behind Railway's proxy the
+  IP is the proxy's, so in practice it's per-username: someone could lock a
+  friend out for 15 minutes by spamming wrong passwords. Acceptable for a
+  friend group; the fix is trusting `X-Forwarded-For` from the proxy.
+- No password reset (no email). A friend who forgets their password needs a
+  manual DB fix; an admin reset command would be the next step.
 
 ## 8. Decision log
 - 2026-10-06: Initial design (this document).
