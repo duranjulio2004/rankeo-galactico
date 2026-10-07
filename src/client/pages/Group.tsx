@@ -23,7 +23,7 @@ export function GroupPage({ id }: { id: number }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      toast('Link copiado 🚀');
+      toast('Link copiado');
     } catch {
       setShowInvite(true);
     }
@@ -81,7 +81,7 @@ export function GroupPage({ id }: { id: number }) {
       <section className="stack">
         <h2>Listas del grupo</h2>
         {lists.length === 0 ? (
-          <Empty icon="🛸" title="Este grupo no tiene listas todavía">
+          <Empty title="Este grupo no tiene listas todavía">
             <Link href={`/new?group=${id}`} className="btn btn-primary">
               Crear la primera
             </Link>

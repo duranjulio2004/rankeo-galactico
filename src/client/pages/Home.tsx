@@ -13,7 +13,7 @@ export function ListCard({ list }: { list: ListSummary }) {
         <div className="list-card-title">
           <h3>{list.title}</h3>
           <span className="muted small">
-            {list.group ? `${list.group.emoji} ${list.group.name}` : '🔒 Personal'} · {pluralize(list.itemCount, 'ítem', 'ítems')}
+            {list.group ? `${list.group.emoji} ${list.group.name}` : 'Personal'} · {pluralize(list.itemCount, 'ítem', 'ítems')}
             {list.group && list.voters > 0 ? ` · ${pluralize(list.voters, 'rankeador', 'rankeadores')}` : ''}
           </span>
         </div>
@@ -37,7 +37,7 @@ export function HomePage() {
     <div className="stack-lg">
       <section className="hero-row">
         <div>
-          <h1>Hola, {user?.displayName} 👋</h1>
+          <h1>Hola, {user?.displayName}</h1>
           <p className="muted">¿Qué vamos a rankear hoy?</p>
         </div>
         <Link href="/new" className="btn btn-primary">
@@ -77,7 +77,7 @@ export function HomePage() {
         {lists.loading && !lists.data && <Spinner />}
         {lists.error && <ErrorBox message={lists.error} onRetry={lists.reload} />}
         {lists.data && lists.data.lists.length === 0 && (
-          <Empty icon="🌌" title="Aún no hay nada que rankear">
+          <Empty title="Aún no hay nada que rankear">
             <p className="muted">Crea una lista (completos, películas, ramos, lo que sea) y empieza con los duelos.</p>
             <Link href="/new" className="btn btn-primary">
               Crear mi primera lista

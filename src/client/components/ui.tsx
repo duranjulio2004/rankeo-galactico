@@ -65,10 +65,9 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
   );
 }
 
-export function Empty({ icon, title, children }: { icon: string; title: string; children?: ReactNode }) {
+export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="empty">
-      <div className="empty-icon">{icon}</div>
       <h3>{title}</h3>
       {children}
     </div>

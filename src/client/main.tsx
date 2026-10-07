@@ -51,7 +51,6 @@ function App() {
             <Route path="/join/:code">{(p) => <JoinPage code={p.code} />}</Route>
             <Route>
               <div className="empty">
-                <div className="empty-icon">🕳️</div>
                 <h3>Esta página se fue a un agujero negro</h3>
                 <Link href="/" className="btn">
                   Volver al inicio

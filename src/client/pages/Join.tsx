@@ -55,7 +55,7 @@ export function JoinPage({ code }: { code: string }) {
         </Link>
       ) : (
         <button className="btn btn-primary" onClick={join}>
-          Unirme al grupo 🚀
+          Unirme al grupo
         </button>
       )}
       {error && <p className="form-error">{error}</p>}

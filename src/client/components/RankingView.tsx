@@ -54,7 +54,7 @@ export function RankingView({ ranking, items, emptyHint }: { ranking: Ranking; i
             const pct = ((r.rating - minRating) / span) * 100;
             return (
               <li key={r.itemId} className={`rank-row rank-${r.rank <= 3 ? r.rank : 'n'}`}>
-                <span className="rank-num">{r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span>
+                <span className="rank-num">{r.rank}</span>
                 <ItemFace item={item} size={40} />
                 <div className="rank-main">
                   <div className="rank-name">

@@ -22,10 +22,10 @@ export function ListPage({ id, tab }: { id: number; tab: string }) {
   const { list, group } = detail.data;
 
   const tabs: [string, string][] = [
-    ['duelo', '⚔️ Duelo'],
-    ['ranking', '🏆 Mi ranking'],
-    ...(group ? ([['grupo', '👥 Grupo']] as [string, string][]) : []),
-    ['items', `📋 Ítems`],
+    ['duelo', 'Duelo'],
+    ['ranking', 'Mi ranking'],
+    ...(group ? ([['grupo', 'Grupo']] as [string, string][]) : []),
+    ['items', 'Ítems'],
   ];
 
   return (
@@ -41,7 +41,7 @@ export function ListPage({ id, tab }: { id: number; tab: string }) {
                   {group.emoji} {group.name}
                 </Link>
               ) : (
-                '🔒 Lista personal'
+                'Lista personal'
               )}
               {list.description ? ` · ${list.description}` : ''}
             </p>
@@ -96,7 +96,7 @@ function PersonalTab({ listId, items, members, isGroup, version }: { listId: num
           />
           {isMe && ranking.data.votes > 0 && (
             <Link href={`/lists/${listId}/duelo`} className="btn btn-primary">
-              Seguir rankeando ⚔️
+              Seguir rankeando
             </Link>
           )}
         </>
@@ -148,7 +148,7 @@ function InsightsPanel({ insights, name, itemName, items }: { insights: Insights
   if (!hasAnything) {
     return (
       <aside className="card insights">
-        <h3>🔭 Observatorio</h3>
+        <h3>Observatorio</h3>
         <p className="muted small">Cuando al menos dos personas rankeen unos cuantos ítems en común, aquí verás quién piensa igual que tú y qué ítems dividen al grupo.</p>
       </aside>
     );
@@ -156,17 +156,17 @@ function InsightsPanel({ insights, name, itemName, items }: { insights: Insights
 
   const takeLine = (t: { itemId: number; delta: number }) => (
     <li key={t.itemId}>
-      <strong>{itemName(t.itemId)}</strong>: {t.delta < 0 ? 'mucho más arriba' : 'mucho más abajo'} que el grupo {t.delta < 0 ? '📈' : '📉'}
+      <strong>{itemName(t.itemId)}</strong>: {t.delta < 0 ? 'mucho más arriba' : 'mucho más abajo'} que el grupo
     </li>
   );
 
   return (
     <aside className="card insights stack">
-      <h3>🔭 Observatorio</h3>
+      <h3>Observatorio</h3>
       {insights.soulmate && (
         <div className="insight">
           {/* "Soulmate" only means something when there's more than one person to compare with. */}
-          <span className="insight-label">{insights.opposite ? '💞 Tu alma gemela' : `🤝 Acuerdo con ${name(insights.soulmate.userId)}`}</span>
+          <span className="insight-label">{insights.opposite ? 'Tu alma gemela' : `Acuerdo con ${name(insights.soulmate.userId)}`}</span>
           <span>
             <strong>{name(insights.soulmate.userId)}</strong>: {pct(insights.soulmate.agreement)} de acuerdo
           </span>
@@ -174,7 +174,7 @@ function InsightsPanel({ insights, name, itemName, items }: { insights: Insights
       )}
       {insights.opposite && insights.opposite.userId !== insights.soulmate?.userId && (
         <div className="insight">
-          <span className="insight-label">⚡ Tu polo opuesto</span>
+          <span className="insight-label">Tu polo opuesto</span>
           <span>
             <strong>{name(insights.opposite.userId)}</strong>: {pct(insights.opposite.agreement)} de acuerdo
           </span>
@@ -182,7 +182,7 @@ function InsightsPanel({ insights, name, itemName, items }: { insights: Insights
       )}
       {insights.divisive.length > 0 && (
         <div className="insight">
-          <span className="insight-label">🔥 Los más polémicos</span>
+          <span className="insight-label">Los más polémicos</span>
           <div className="chips">
             {insights.divisive.map((d) => {
               const item = items.get(d.itemId);
@@ -197,13 +197,13 @@ function InsightsPanel({ insights, name, itemName, items }: { insights: Insights
       )}
       {myTakes.length > 0 && (
         <div className="insight">
-          <span className="insight-label">🌶️ Tus hot takes</span>
+          <span className="insight-label">Tus hot takes</span>
           <ul className="takes">{myTakes.map(takeLine)}</ul>
         </div>
       )}
       {otherTakes.map((h) => (
         <div className="insight" key={h.userId}>
-          <span className="insight-label">🌶️ Hot takes de {name(h.userId)}</span>
+          <span className="insight-label">Hot takes de {name(h.userId)}</span>
           <ul className="takes">{h.takes.map(takeLine)}</ul>
         </div>
       ))}

@@ -485,9 +485,6 @@ select option {
   gap: 10px;
   padding: 40px 16px;
 }
-.empty-icon {
-  font-size: 3rem;
-}
 
 .toast-host {
   position: fixed;
@@ -809,6 +806,15 @@ select option {
   border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid transparent;
+}
+.rank-1 .rank-num {
+  color: #ffd84c;
+}
+.rank-2 .rank-num {
+  color: #d9dcf0;
+}
+.rank-3 .rank-num {
+  color: #e0a070;
 }
 .rank-1 {
   border-color: rgba(255, 216, 76, 0.45);

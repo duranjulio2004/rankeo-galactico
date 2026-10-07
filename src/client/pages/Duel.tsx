@@ -6,9 +6,9 @@ import { ConfidenceBar, ErrorBox, ItemFace, Spinner, toast } from '../components
 type Pick = 'left' | 'right' | 'tie' | 'skip' | null;
 
 const MILESTONES: [number, string][] = [
-  [0.5, '¡Tu rankeo ya está 50% seguro! Sigue así 🚀'],
-  [0.75, '75% seguro: ya puedes mirar tu ranking con confianza 👀'],
-  [0.9, '90%: rankeo galáctico desbloqueado 🌌'],
+  [0.5, 'Tu rankeo ya está 50% seguro. Sigue así.'],
+  [0.75, '75% seguro: ya puedes mirar tu ranking con confianza.'],
+  [0.9, '90%: rankeo galáctico desbloqueado.'],
 ];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -71,7 +71,7 @@ export function DuelView({ listId, onVoted }: { listId: number; onVoted?: () => 
   const undo = useCallback(() => {
     if (!duel || duel.votes === 0) return;
     void run(null, () => post<Duel>(`/lists/${listId}/votes/undo`)).then(() => {
-      toast('Voto deshecho ↩️');
+      toast('Voto deshecho');
       onVoted?.();
     });
   }, [duel, listId, run, onVoted]);
@@ -117,7 +117,6 @@ export function DuelView({ listId, onVoted }: { listId: number; onVoted?: () => 
   if (!pair) {
     return (
       <div className="empty">
-        <div className="empty-icon">🛰️</div>
         <h3>Faltan contendores</h3>
         <p className="muted">
           Necesitas al menos 2 ítems para un duelo
@@ -171,13 +170,13 @@ export function DuelView({ listId, onVoted }: { listId: number; onVoted?: () => 
 
       <div className="duel-actions">
         <button className="btn btn-ghost" onClick={() => vote('tie')}>
-          🤝 Empate <kbd className="hide-touch">↓</kbd>
+          Empate <kbd className="hide-touch">↓</kbd>
         </button>
         <button className="btn btn-ghost" onClick={skip}>
-          ⏭️ Paso <kbd className="hide-touch">␣</kbd>
+          Paso <kbd className="hide-touch">␣</kbd>
         </button>
         <button className="btn btn-ghost" onClick={undo} disabled={duel.votes === 0}>
-          ↩️ Deshacer <kbd className="hide-touch">Z</kbd>
+          Deshacer <kbd className="hide-touch">Z</kbd>
         </button>
       </div>
     </div>

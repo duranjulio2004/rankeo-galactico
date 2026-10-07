@@ -96,7 +96,7 @@ export function NewListPage() {
         <label>
           ¿De quién es?
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            <option value="">🔒 Solo mía (personal)</option>
+            <option value="">Solo mía (personal)</option>
             {groups.data?.groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.emoji} {g.name}: ranking grupal
