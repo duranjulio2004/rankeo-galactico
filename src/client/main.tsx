@@ -1,9 +1,11 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Route, Switch, Link, useLocation } from 'wouter';
-import { get, post, type User } from './api.ts';
+import { get, type User } from './api.ts';
 import { Spinner, ToastHost } from './components/ui.tsx';
-import { AuthPage } from './pages/Auth.tsx';
+import { AccessPage, AuthPage } from './pages/Auth.tsx';
+import { AdminPage } from './pages/Admin.tsx';
+import { MePage } from './pages/Me.tsx';
 import { HomePage } from './pages/Home.tsx';
 import { NewListPage } from './pages/NewList.tsx';
 import { ListPage } from './pages/List.tsx';
@@ -34,13 +36,13 @@ function App() {
     );
   }
 
-  // The join page handles its own logged-out state (sign up + join in one go).
-  const isJoin = location.startsWith('/join/');
+  // Join and access-link pages handle their own logged-out state.
+  const isPublic = location.startsWith('/join/') || location.startsWith('/acceso/');
   return (
     <SessionContext.Provider value={{ user, setUser }}>
-      {user && <TopBar user={user} onLogout={() => setUser(null)} />}
+      {user && <TopBar user={user} />}
       <main className="page">
-        {!user && !isJoin ? (
+        {!user && !isPublic ? (
           <AuthPage />
         ) : (
           <Switch>
@@ -49,6 +51,9 @@ function App() {
             <Route path="/lists/:id/:tab?">{(p) => <ListPage id={Number(p.id)} tab={p.tab ?? 'duelo'} />}</Route>
             <Route path="/groups/:id">{(p) => <GroupPage id={Number(p.id)} />}</Route>
             <Route path="/join/:code">{(p) => <JoinPage code={p.code} />}</Route>
+            <Route path="/acceso/:key">{(p) => <AccessPage accessKey={p.key} />}</Route>
+            <Route path="/yo" component={MePage} />
+            <Route path="/admin" component={AdminPage} />
             <Route>
               <div className="empty">
                 <h3>Esta página se fue a un agujero negro</h3>
@@ -65,13 +70,7 @@ function App() {
   );
 }
 
-function TopBar({ user, onLogout }: { user: User; onLogout: () => void }) {
-  const [, navigate] = useLocation();
-  const logout = async () => {
-    await post('/auth/logout').catch(() => {});
-    onLogout();
-    navigate('/');
-  };
+function TopBar({ user }: { user: User }) {
   return (
     <header className="topbar">
       <Link href="/" className="brand">
@@ -80,12 +79,16 @@ function TopBar({ user, onLogout }: { user: User; onLogout: () => void }) {
           Rankeo <em>Galáctico</em>
         </span>
       </Link>
-      <div className="topbar-user">
-        <span className="muted hide-sm">{user.displayName}</span>
-        <button className="btn btn-ghost btn-sm" onClick={logout}>
-          Salir
-        </button>
-      </div>
+      <nav className="topbar-user">
+        {user.isAdmin && (
+          <Link href="/admin" className="btn btn-ghost btn-sm">
+            Admin
+          </Link>
+        )}
+        <Link href="/yo" className="btn btn-ghost btn-sm" title="Tu nombre y link de acceso">
+          {user.displayName}
+        </Link>
+      </nav>
     </header>
   );
 }

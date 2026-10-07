@@ -6,7 +6,7 @@ confidence bars, auto tier lists, and, for group lists, a shared group
 ranking plus who-agrees-with-whom insights.
 
 **Status:** v1 feature-complete (duels, personal and group rankings, tiers,
-invites, insights). 47 automated tests passing. Deployable to Railway; not
+invites, insights) with no-account entry (code + name). 57 automated tests passing. Deployable to Railway; not
 deployed yet.
 
 See **[DESIGN.md](DESIGN.md)** for what it is, the key decisions and why, and
@@ -35,8 +35,28 @@ Environment variables (all optional):
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
 | `DATABASE_PATH` | `./data/rankeo.db` | SQLite file (created on first run, schema auto-migrates) |
-| `SIGNUP_CODE` | unset | If set, signing up requires this code **or** a valid group invite link |
+| `ADMIN_CODE` | `admin` in dev, unset in production | Secret code that logs into the single admin account (see below). Without it in production, nobody can be admin |
+| `TRUST_PROXY` | on in production | Use the proxy's `X-Forwarded-For` for the client IP (rate limiting). Set `1` to force on |
 | `NODE_ENV` | — | `production` marks session cookies `Secure` |
+
+## How people get in (no accounts)
+
+There are no passwords. You enter with a **code + your name**, and that device
+remembers you (1-year cookie, renewed while you use it).
+
+- **Group code / invite link:** joins that group. On the invite link only the
+  name is asked. Already signed in? Paste the code in "¿Tienes un código?" on
+  the home page.
+- **`ADMIN_CODE`:** logs into the single admin account. On a fresh install, the
+  first person to use it becomes admin. If you're already signed in at
+  that point, *you* are promoted (your votes stay yours).
+- **Names are unique**, so nobody can become "Ana" by typing "Ana".
+- **New device / cleared browser:** open your personal **access link** (Yo →
+  "Generar mi link de acceso"). Lost it? The admin generates a new one from
+  the Admin page. Generating a link invalidates the previous one.
+
+First run: enter with the admin code (`admin` locally), create a group, share
+its invite link.
 
 ## Test
 
@@ -48,7 +68,8 @@ npm run typecheck  # tsc over server, client and tests
 - `test/ranking.test.ts`: model fitting, confidence, pair selection (including
   simulations: a noisy voter with a hidden true order, active vs. random pairing),
   group weighting, agreement/divisive/hot takes, tiers.
-- `test/api.test.ts`: auth, sessions, CSRF guard, rate limit, signup code,
+- `test/api.test.ts`: code + name entry, unique names, access links, admin
+  (recovery, rename, delete), sessions, CSRF guard, rate limit,
   group/list access control, voting, undo, exclusions, archiving, group
   rankings and insights.
 - The UI has no automated tests; it was checked by driving the production
@@ -66,9 +87,8 @@ on `/api/health`, single replica: SQLite needs exactly one writer).
 4. In the Railway dashboard, open the service:
    - **Add a Volume** mounted at **`/data`** (the database lives at `/data/rankeo.db`).
    - **Settings → Networking → Generate Domain** to get a public URL.
-   - **Variables:** add `SIGNUP_CODE` with a code of your choice (recommended,
-     so strangers who find the URL can't sign up; friends join via invite links).
-     Set it in the dashboard; don't commit it.
+   - **Variables:** add `ADMIN_CODE` with a long secret of your choice. Set it in
+     the dashboard; don't commit it. It's the only way to become admin.
 5. `railway up` again (or connect the GitHub repo for auto-deploys on push).
 
 Backups: the whole state is one SQLite file on the volume; enable Railway's

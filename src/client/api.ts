@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 export interface User {
   id: number;
-  username: string;
   displayName: string;
+  isAdmin: boolean;
 }
 
 export interface Item {

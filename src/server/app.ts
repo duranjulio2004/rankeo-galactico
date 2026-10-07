@@ -3,14 +3,16 @@ import { getCookie } from 'hono/cookie';
 import { userForSession } from './auth.ts';
 import type { Db } from './db.ts';
 import { HttpError, type AppEnv } from './http.ts';
-import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
+import { authRoutes, setSessionCookie, SESSION_COOKIE } from './routes/auth.ts';
+import { adminRoutes } from './routes/admin.ts';
 import { groupRoutes, inviteRoutes } from './routes/groups.ts';
 import { listRoutes, itemRoutes } from './routes/lists.ts';
 
 export interface AppOptions {
   db: Db;
   secureCookies?: boolean;
-  signupCode?: string;
+  adminCode?: string;
+  trustProxy?: boolean;
 }
 
 export function createApp(opts: AppOptions) {
@@ -25,12 +27,16 @@ export function createApp(opts: AppOptions) {
     }
     c.set('db', opts.db);
     const token = getCookie(c, SESSION_COOKIE);
-    c.set('user', token ? userForSession(opts.db, token) : null);
+    const session = token ? userForSession(opts.db, token) : null;
+    c.set('user', session?.user ?? null);
+    // Sliding expiry: people who keep using the app never get logged out.
+    if (token && session?.renewed) setSessionCookie(c, token, opts.secureCookies ?? false);
     await next();
     c.header('Cache-Control', 'no-store');
   });
 
-  app.route('/api/auth', authRoutes({ secureCookies: opts.secureCookies ?? false, signupCode: opts.signupCode }));
+  app.route('/api/auth', authRoutes({ secureCookies: opts.secureCookies ?? false, adminCode: opts.adminCode, trustProxy: opts.trustProxy }));
+  app.route('/api/admin', adminRoutes());
   app.route('/api/groups', groupRoutes());
   app.route('/api/invites', inviteRoutes());
   app.route('/api/lists', listRoutes());

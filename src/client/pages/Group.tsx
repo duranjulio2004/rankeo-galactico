@@ -65,7 +65,7 @@ export function GroupPage({ id }: { id: number }) {
       <section className="card invite">
         <div>
           <h3>Invita a tus amigos</h3>
-          <p className="muted small">Cualquiera con este link puede unirse al grupo (y crear su cuenta si no tiene).</p>
+          <p className="muted small">Cualquiera con este link (o su código) entra al grupo solo poniendo su nombre.</p>
           {showInvite && <input readOnly value={inviteUrl} onFocus={(e) => e.currentTarget.select()} />}
         </div>
         <div className="row">

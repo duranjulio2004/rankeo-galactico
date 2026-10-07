@@ -32,7 +32,7 @@ export function JoinPage({ code }: { code: string }) {
   const { group, alreadyMember, groupId } = preview.data;
 
   if (!user) {
-    return <AuthPage inviteCode={code} title={`Te invitaron a ${group.emoji} ${group.name}. Crea tu cuenta (o entra) para unirte.`} />;
+    return <AuthPage code={code} title={`Te invitaron a ${group.emoji} ${group.name}. Pon tu nombre y listo.`} />;
   }
 
   const join = async () => {

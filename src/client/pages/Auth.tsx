@@ -1,15 +1,14 @@
 import { useState, type FormEvent } from 'react';
+import { useLocation } from 'wouter';
 import { post, type User } from '../api.ts';
 import { useSession } from '../session.ts';
 
-/** Login / sign-up. `inviteCode` is sent as the sign-up code when joining via link. */
-export function AuthPage({ inviteCode, title }: { inviteCode?: string; title?: string }) {
+/** Enter with a code + name. With `code` preset (invite link), only the name is asked. */
+export function AuthPage({ code: presetCode, title }: { code?: string; title?: string }) {
   const { setUser } = useSession();
-  const [mode, setMode] = useState<'login' | 'register'>(inviteCode ? 'register' : 'login');
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
+  const [, navigate] = useLocation();
+  const [code, setCode] = useState(presetCode ?? '');
+  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -18,9 +17,9 @@ export function AuthPage({ inviteCode, title }: { inviteCode?: string; title?: s
     setBusy(true);
     setError(null);
     try {
-      const body = mode === 'login' ? { username, password } : { username, password, displayName, code: inviteCode ?? code };
-      const r = await post<{ user: User }>(`/auth/${mode}`, body);
+      const r = await post<{ user: User; groupId: number | null }>('/auth/enter', { code, name });
       setUser(r.user);
+      navigate(r.groupId ? `/groups/${r.groupId}` : '/');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -38,46 +37,58 @@ export function AuthPage({ inviteCode, title }: { inviteCode?: string; title?: s
         <p className="muted">{title ?? 'Rankea lo que sea con tus amigos. Dos opciones, eliges una, y de a poco sale el ranking definitivo.'}</p>
       </div>
       <form className="card auth-card" onSubmit={submit}>
-        <div className="segmented" role="tablist">
-          <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>
-            Entrar
-          </button>
-          <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>
-            Crear cuenta
-          </button>
-        </div>
-        <label>
-          Usuario
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" required minLength={3} maxLength={24} />
-        </label>
-        {mode === 'register' && (
+        {!presetCode && (
           <label>
-            Nombre para mostrar
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Como te conocen tus amigos" maxLength={40} />
+            Código
+            <input value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} required />
           </label>
         )}
         <label>
-          Contraseña
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            required
-            minLength={mode === 'register' ? 8 : 1}
-          />
+          Tu nombre
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Como te conocen tus amigos" required maxLength={30} autoFocus={!!presetCode} />
         </label>
-        {mode === 'register' && !inviteCode && (
-          <label>
-            <span>Código de invitación <span className="muted">(si te lo pidieron)</span></span>
-            <input value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="none" />
-          </label>
-        )}
         {error && <p className="form-error">{error}</p>}
         <button className="btn btn-primary btn-block" disabled={busy}>
-          {busy ? '…' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+          {busy ? '…' : 'Entrar'}
         </button>
+        <p className="muted small">
+          Sin contraseñas: este dispositivo te recuerda. Si ya entraste antes en otro lado, abre tu <strong>link de acceso</strong> (lo encuentras en "Yo") en vez de
+          volver a poner tu nombre.
+        </p>
       </form>
+    </div>
+  );
+}
+
+/** /acceso/:key: logs this device in as the owner of the access link. */
+export function AccessPage({ accessKey }: { accessKey: string }) {
+  const { user, setUser } = useSession();
+  const [, navigate] = useLocation();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const enter = async () => {
+    setBusy(true);
+    try {
+      const r = await post<{ user: User }>('/auth/access', { key: accessKey });
+      setUser(r.user);
+      navigate('/');
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card stack narrow center-text">
+      <h1>Link de acceso</h1>
+      <p className="muted">
+        {user ? `Ahora estás como ${user.displayName}. Si sigues, este dispositivo pasa a ser de la persona dueña del link.` : 'Entra como la persona dueña de este link.'}
+      </p>
+      {error && <p className="form-error">{error}</p>}
+      <button className="btn btn-primary" onClick={enter} disabled={busy}>
+        Entrar con este link
+      </button>
     </div>
   );
 }

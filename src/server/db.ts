@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 export type Db = DatabaseSync;
 
 // Append-only list of migrations; the index + 1 is the schema version.
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `
   CREATE TABLE users (
     id INTEGER PRIMARY KEY,
@@ -79,6 +79,26 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, item_id)
   );
   `,
+  // v2: no accounts. People enter with a code + name; no username/password.
+  // Rebuilds users keeping ids (so votes/groups stay attached); clashing
+  // display names get the id appended so the new UNIQUE constraint holds.
+  `
+  CREATE TABLE users_new (
+    id INTEGER PRIMARY KEY,
+    display_name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    access_key_hash TEXT UNIQUE,
+    created_at INTEGER NOT NULL
+  );
+  INSERT INTO users_new (id, display_name, created_at)
+    SELECT id,
+           CASE WHEN EXISTS (SELECT 1 FROM users o WHERE o.display_name = u.display_name COLLATE NOCASE AND o.id < u.id)
+                THEN u.display_name || ' ' || u.id ELSE u.display_name END,
+           created_at
+    FROM users u;
+  DROP TABLE users;
+  ALTER TABLE users_new RENAME TO users;
+  `,
 ];
 
 export function openDb(path: string): Db {
@@ -92,11 +112,22 @@ export function openDb(path: string): Db {
 
 function migrate(db: Db): void {
   const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
-  for (let v = version; v < MIGRATIONS.length; v++) {
-    transaction(db, () => {
-      db.exec(MIGRATIONS[v]!);
-      db.exec(`PRAGMA user_version = ${v + 1}`);
-    });
+  if (version >= MIGRATIONS.length) return;
+  // Table rebuilds (v2) must not cascade-delete rows that reference the old
+  // table, so foreign keys are off during migrations (it can't be changed
+  // inside a transaction) and checked afterwards.
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    for (let v = version; v < MIGRATIONS.length; v++) {
+      transaction(db, () => {
+        db.exec(MIGRATIONS[v]!);
+        db.exec(`PRAGMA user_version = ${v + 1}`);
+      });
+    }
+    const broken = db.prepare('PRAGMA foreign_key_check').all();
+    if (broken.length > 0) throw new Error(`Migration left ${broken.length} broken foreign keys`);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
   }
 }
 

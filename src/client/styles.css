@@ -981,6 +981,36 @@ summary {
   font-weight: 500;
   overflow-wrap: anywhere;
 }
+.code-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: 460px;
+}
+.code-form input {
+  flex: 1 1 220px;
+  padding: 7px 12px;
+  font-size: 0.92rem;
+}
+.code-form .form-error {
+  width: 100%;
+}
+.admin-row {
+  align-items: flex-start;
+}
+.admin-user {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.admin-pill {
+  margin-left: 8px;
+}
+.admin-link {
+  width: 100%;
+}
 .item-editor {
   display: flex;
   gap: 8px;

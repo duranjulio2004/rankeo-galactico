@@ -32,59 +32,150 @@ class Client {
 }
 
 let app: App;
-const freshApp = (opts: { signupCode?: string } = {}) => createApp({ db: openDb(':memory:'), ...opts });
+const ADMIN = 'test-admin-code';
+const freshApp = () => createApp({ db: openDb(':memory:'), adminCode: ADMIN });
 
-async function register(name: string, a: App = app, extra: Record<string, unknown> = {}) {
+/** Each app gets an admin and a "lobby" group whose code new test users enter with. */
+const lobbies = new WeakMap<App, string>();
+async function lobbyCode(a: App): Promise<string> {
+  let code = lobbies.get(a);
+  if (!code) {
+    const admin = new Client(a);
+    await admin.post('/api/auth/enter', { code: ADMIN, name: 'Admin' });
+    const g = (await admin.post('/api/groups', { name: 'Lobby' })).json.group;
+    code = (await admin.get(`/api/groups/${g.id}`)).json.group.inviteCode as string;
+    lobbies.set(a, code);
+  }
+  return code;
+}
+
+async function register(name: string, a: App = app) {
   const c = new Client(a);
-  const r = await c.post('/api/auth/register', { username: name, password: 'password123', displayName: name.toUpperCase(), ...extra });
+  const r = await c.post('/api/auth/enter', { code: await lobbyCode(a), name });
   assert.equal(r.status, 201, JSON.stringify(r.json));
   return Object.assign(c, { id: r.json.user.id as number });
+}
+
+async function adminClient(a: App = app) {
+  const c = new Client(a);
+  assert.equal((await c.post('/api/auth/enter', { code: ADMIN, name: 'Admin' })).status, 200);
+  return c;
 }
 
 beforeEach(() => {
   app = freshApp();
 });
 
-describe('auth', () => {
-  test('register, me, logout, login', async () => {
+describe('entering (no accounts)', () => {
+  test('code + name creates you, joins the group and keeps you signed in', async () => {
     const c = await register('julio');
-    assert.equal((await c.get('/api/auth/me')).json.user.username, 'julio');
-    await c.post('/api/auth/logout');
+    const me = (await c.get('/api/auth/me')).json.user;
+    assert.equal(me.displayName, 'julio');
+    assert.equal(me.isAdmin, false);
+    const groups = (await c.get('/api/groups')).json.groups as { name: string }[];
+    assert.deepEqual(groups.map((g) => g.name), ['Lobby']);
+  });
+
+  test('wrong code is rejected, and repeated wrong guesses get rate limited', async () => {
+    const c = new Client(app);
+    let status = 0;
+    for (let i = 0; i < 11; i++) status = (await c.post('/api/auth/enter', { code: 'nope', name: 'x' })).status;
+    assert.equal(status, 429);
+  });
+
+  test('names are unique: you cannot become someone else by typing their name', async () => {
+    await register('Ana');
+    const c = new Client(app);
+    const r = await c.post('/api/auth/enter', { code: await lobbyCode(app), name: '  ana ' });
+    assert.equal(r.status, 409);
     assert.equal((await c.get('/api/auth/me')).status, 401);
-    const bad = await c.post('/api/auth/login', { username: 'julio', password: 'nope-nope' });
-    assert.equal(bad.status, 401);
-    const ok = await c.post('/api/auth/login', { username: 'JULIO', password: 'password123' });
-    assert.equal(ok.status, 200);
-    assert.equal((await c.get('/api/auth/me')).status, 200);
   });
 
-  test('session cookie is HttpOnly + SameSite=Lax and token is not stored in plain text', async () => {
+  test('name validation', async () => {
+    const c = new Client(app);
+    const code = await lobbyCode(app);
+    assert.equal((await c.post('/api/auth/enter', { code, name: '' })).status, 400);
+    assert.equal((await c.post('/api/auth/enter', { code, name: '!!!' })).status, 400);
+    assert.equal((await c.post('/api/auth/enter', { code, name: 'x'.repeat(31) })).status, 400);
+  });
+
+  test('entering another group code while signed in joins it as the same person', async () => {
+    const julio = await register('julio');
+    const ana = await register('ana');
+    const g = (await ana.post('/api/groups', { name: 'Otro' })).json.group;
+    const code = (await ana.get(`/api/groups/${g.id}`)).json.group.inviteCode;
+    const r = await julio.post('/api/auth/enter', { code, name: 'ignored' });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.user.id, julio.id);
+    assert.equal(r.json.groupId, g.id);
+  });
+
+  test('admin code always returns to the single admin account', async () => {
+    const a1 = await adminClient();
+    const id = (await a1.get('/api/auth/me')).json.user.id;
+    const a2 = new Client(app);
+    const r = await a2.post('/api/auth/enter', { code: ADMIN, name: 'Someone else' });
+    assert.equal(r.json.user.id, id);
+    assert.equal(r.json.user.isAdmin, true);
+  });
+
+  test('first admin claim while signed in promotes you; later claims just log into that admin', async () => {
     const db = openDb(':memory:');
-    const a = createApp({ db });
+    const a = createApp({ db, adminCode: ADMIN });
+    // An upgraded install: people and a group exist, but no admin yet.
+    db.exec(`INSERT INTO users (id, display_name, created_at) VALUES (1, 'Seed', 0);
+             INSERT INTO groups (id, name, invite_code, created_by, created_at) VALUES (1, 'G', 'seedcode', 1, 0);`);
+    const julio = new Client(a);
+    const joined = (await julio.post('/api/auth/enter', { code: 'seedcode', name: 'Julio' })).json.user;
+    const promoted = (await julio.post('/api/auth/enter', { code: ADMIN })).json.user;
+    assert.equal(promoted.id, joined.id, 'same account, now admin');
+    assert.equal(promoted.isAdmin, true);
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n, 2, 'no extra account created');
+
+    const other = new Client(a);
+    await other.post('/api/auth/enter', { code: 'seedcode', name: 'Otro' });
+    const r = (await other.post('/api/auth/enter', { code: ADMIN })).json.user;
+    assert.equal(r.id, joined.id, 'admin already exists: logs into it, does not promote Otro');
+  });
+
+  test('without an admin code configured, nothing logs in as admin', async () => {
+    const a = createApp({ db: openDb(':memory:') });
+    const r = await new Client(a).post('/api/auth/enter', { code: '', name: 'x' });
+    assert.equal(r.status, 404);
+  });
+
+  test('access link: logs you in on another device; issuing a new one kills the old', async () => {
+    const julio = await register('julio');
+    const key1 = (await julio.post('/api/auth/access-key')).json.key as string;
+    const phone = new Client(app);
+    const r = await phone.post('/api/auth/access', { key: key1 });
+    assert.equal(r.json.user.id, julio.id);
+    const key2 = (await julio.post('/api/auth/access-key')).json.key as string;
+    assert.notEqual(key1, key2);
+    assert.equal((await new Client(app).post('/api/auth/access', { key: key1 })).status, 404);
+    assert.equal((await new Client(app).post('/api/auth/access', { key: key2 })).status, 200);
+  });
+
+  test('session cookie is HttpOnly + SameSite=Lax; tokens and access keys are stored hashed', async () => {
+    const db = openDb(':memory:');
+    const a = createApp({ db, adminCode: ADMIN });
     const c = new Client(a);
-    const r = await c.post('/api/auth/register', { username: 'ana', password: 'password123' });
-    const header = r.headers.get('set-cookie')!;
-    assert.match(header, /HttpOnly/);
-    assert.match(header, /SameSite=Lax/);
+    const r = await c.post('/api/auth/enter', { code: ADMIN, name: 'Admin' });
+    assert.match(r.headers.get('set-cookie')!, /HttpOnly/);
+    assert.match(r.headers.get('set-cookie')!, /SameSite=Lax/);
     const token = c.cookie.split('=')[1]!;
-    const row = db.prepare('SELECT token_hash FROM sessions').get() as { token_hash: string };
-    assert.notEqual(row.token_hash, token);
+    assert.notEqual((db.prepare('SELECT token_hash FROM sessions').get() as { token_hash: string }).token_hash, token);
+    const key = (await c.post('/api/auth/access-key')).json.key;
+    assert.notEqual((db.prepare('SELECT access_key_hash FROM users').get() as { access_key_hash: string }).access_key_hash, key);
   });
 
-  test('validation: duplicate user, short password, bad username', async () => {
-    await register('julio');
-    const c = new Client(app);
-    assert.equal((await c.post('/api/auth/register', { username: 'Julio', password: 'password123' })).status, 409);
-    assert.equal((await c.post('/api/auth/register', { username: 'pedro', password: 'short' })).status, 400);
-    assert.equal((await c.post('/api/auth/register', { username: 'a b', password: 'password123' })).status, 400);
-  });
-
-  test('login is rate limited', async () => {
-    await register('julio');
-    const c = new Client(app);
-    let last = 0;
-    for (let i = 0; i < 11; i++) last = (await c.post('/api/auth/login', { username: 'julio', password: 'wrong-pass' })).status;
-    assert.equal(last, 429);
+  test('logout ends the session; rename keeps names unique', async () => {
+    const julio = await register('julio');
+    await register('ana');
+    assert.equal((await julio.patch('/api/auth/me', { name: 'ANA' })).status, 409);
+    assert.equal((await julio.patch('/api/auth/me', { name: 'Julio D' })).json.user.displayName, 'Julio D');
+    await julio.post('/api/auth/logout');
+    assert.equal((await julio.get('/api/auth/me')).status, 401);
   });
 
   test('mutations without JSON content-type are rejected (CSRF)', async () => {
@@ -92,15 +183,43 @@ describe('auth', () => {
     const r = await c.req('POST', '/api/lists', { title: 'x' }, { 'content-type': 'application/x-www-form-urlencoded' });
     assert.equal(r.status, 415);
   });
+});
 
-  test('signup code: required when configured; a group invite also works', async () => {
-    const a = freshApp({ signupCode: 'galaxia' });
-    const anon = new Client(a);
-    assert.equal((await anon.post('/api/auth/register', { username: 'x1x', password: 'password123' })).status, 403);
-    const owner = await register('owner', a, { code: 'galaxia' });
-    const g = await owner.post('/api/groups', { name: 'Amigos' });
-    const { group } = (await owner.get(`/api/groups/${g.json.group.id}`)).json;
-    await register('friend', a, { code: group.inviteCode });
+describe('admin', () => {
+  test('only the admin can use admin routes', async () => {
+    const julio = await register('julio');
+    assert.equal((await julio.get('/api/admin/users')).status, 403);
+    const admin = await adminClient();
+    const users = (await admin.get('/api/admin/users')).json.users as { displayName: string }[];
+    assert.deepEqual(users.map((u) => u.displayName).sort(), ['Admin', 'julio']);
+  });
+
+  test('admin recovers a locked-out user with a new access link and can rename them', async () => {
+    const julio = await register('julio');
+    const admin = await adminClient();
+    const key = (await admin.post(`/api/admin/users/${julio.id}/access-key`)).json.key;
+    const newPhone = new Client(app);
+    assert.equal((await newPhone.post('/api/auth/access', { key })).json.user.id, julio.id);
+    assert.equal((await admin.patch(`/api/admin/users/${julio.id}`, { name: 'Julito' })).status, 200);
+    assert.equal((await newPhone.get('/api/auth/me')).json.user.displayName, 'Julito');
+  });
+
+  test('deleting a user drops their votes and private lists but keeps shared lists', async () => {
+    const julio = await register('julio');
+    const ana = await register('ana');
+    const g = (await julio.post('/api/groups', { name: 'G' })).json.group;
+    await ana.post('/api/auth/enter', { code: (await julio.get(`/api/groups/${g.id}`)).json.group.inviteCode });
+    const shared = (await julio.post('/api/lists', { title: 'Shared', groupId: g.id, items: ['A', 'B'] })).json.list.id;
+    await julio.post('/api/lists', { title: 'Private', items: ['X', 'Y'] });
+    const items = (await julio.get(`/api/lists/${shared}`)).json.items as { id: number }[];
+    await julio.post(`/api/lists/${shared}/votes`, { left: items[0]!.id, right: items[1]!.id, result: 'left' });
+
+    const admin = await adminClient();
+    assert.equal((await admin.del(`/api/admin/users/${julio.id}`)).status, 200);
+    assert.equal((await julio.get('/api/auth/me')).status, 401, 'their session is gone');
+    assert.equal((await ana.get(`/api/lists/${shared}`)).status, 200, 'shared list survives');
+    assert.equal((await ana.get(`/api/lists/${shared}/group`)).json.contributors.length, 0, 'their votes are gone');
+    assert.equal((await admin.del(`/api/admin/users/${(await admin.get('/api/auth/me')).json.user.id}`)).status, 400);
   });
 });
 

@@ -46,7 +46,7 @@ export function groupRoutes() {
     const group = db.prepare('SELECT id, name, emoji, invite_code AS inviteCode, created_by AS createdBy FROM groups WHERE id = ?').get(id);
     const members = db
       .prepare(
-        `SELECT u.id, u.username, u.display_name AS displayName, m.joined_at AS joinedAt
+        `SELECT u.id, u.display_name AS displayName, m.joined_at AS joinedAt
          FROM group_members m JOIN users u ON u.id = m.user_id WHERE m.group_id = ? ORDER BY m.joined_at`,
       )
       .all(id);

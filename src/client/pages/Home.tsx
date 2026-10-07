@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'wouter';
-import { post, useApi, type GroupSummary, type ListSummary } from '../api.ts';
-import { ConfidenceBar, Empty, ErrorBox, Spinner, pluralize } from '../components/ui.tsx';
+import { post, useApi, type GroupSummary, type ListSummary, type User } from '../api.ts';
+import { ConfidenceBar, Empty, ErrorBox, Spinner, pluralize, toast } from '../components/ui.tsx';
 import { useSession } from '../session.ts';
 
 export function ListCard({ list }: { list: ListSummary }) {
@@ -53,6 +53,7 @@ export function HomePage() {
           </button>
         </div>
         {creatingGroup && <NewGroupForm />}
+        <CodeForm />
         {groups.error && <ErrorBox message={groups.error} onRetry={groups.reload} />}
         {groups.data && groups.data.groups.length === 0 && !creatingGroup && (
           <p className="muted">Todavía no estás en ningún grupo. Crea uno y comparte el link de invitación con tus amigos.</p>
@@ -91,6 +92,38 @@ export function HomePage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** For people already signed in: join another group with its code (or claim admin). */
+function CodeForm() {
+  const { setUser } = useSession();
+  const [, navigate] = useLocation();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const r = await post<{ user: User; groupId: number | null }>('/auth/enter', { code });
+      setUser(r.user);
+      setCode('');
+      if (r.groupId) navigate(`/groups/${r.groupId}`);
+      else toast(r.user.isAdmin ? 'Ahora eres admin' : 'Listo');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <form className="code-form" onSubmit={submit}>
+      <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="¿Tienes un código? Pégalo aquí" aria-label="Código" autoCapitalize="none" spellCheck={false} />
+      <button className="btn btn-sm" disabled={!code.trim()}>
+        Entrar
+      </button>
+      {error && <p className="form-error">{error}</p>}
+    </form>
   );
 }
 

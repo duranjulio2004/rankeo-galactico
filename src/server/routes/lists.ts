@@ -136,7 +136,7 @@ export function listRoutes() {
     const group = list.group_id === null ? null : db.prepare('SELECT id, name, emoji FROM groups WHERE id = ?').get(list.group_id);
     const participants = listParticipants(db, list);
     const members = db
-      .prepare(`SELECT id, username, display_name AS displayName FROM users WHERE id IN (${participants.map(() => '?').join(',')})`)
+      .prepare(`SELECT id, display_name AS displayName FROM users WHERE id IN (${participants.map(() => '?').join(',')})`)
       .all(...participants);
     return c.json({
       list: { id: list.id, title: list.title, description: list.description, emoji: list.emoji, ownerId: list.owner_id, createdAt: list.created_at },

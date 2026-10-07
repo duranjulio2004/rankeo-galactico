@@ -24,8 +24,8 @@ in Chilean Spanish; code and docs are in English.
 | Who edits a group list | Any member can add items; creator can rename/archive items | Friend groups are high-trust; collecting items together is part of the fun. Archiving (not deleting) keeps past votes meaningful. |
 | Tier lists | Auto-generated from the ranking (personal or group) by splitting the score scale at natural breaks | The tier list is a *view* of the ranking, not a second source of truth that can contradict it. Manual tier lists are listed under future work. |
 | Group insights | Agreement matrix (Kendall τ between members), "alma gemela" / "polo opuesto", most divisive items, per-member hot takes | This is what makes a group ranking a social thing instead of an average. |
-| Auth | Username + password, cookie sessions; groups joined via invite link | No email provider needed (would need a paid service/secrets); invite links are how friend groups actually share. |
-| Who can sign up | Open by default; if `SIGNUP_CODE` is set, registering needs that code **or** any valid group invite code | A public URL shouldn't let strangers in, but "here's the invite link" must still be enough for a friend to join. |
+| Identity | **No accounts.** Enter with a code + your name; the device remembers you (1-year sliding cookie). Names are unique. A personal **access link** moves you to another device; one admin (via `ADMIN_CODE`) can reissue links, rename and remove people. | Requested by the owner (2026-10-07): friends shouldn't have to make accounts. Passwords also meant a reset flow we couldn't offer without email. Unique names stop "type Ana, become Ana"; access links cover the real failure mode (new phone, cleared browser) without passwords. Third-party auth (Supabase) was evaluated and rejected: its free tier pauses after a week idle, and it would add a second service for tens of users. |
+| Getting in | Group invite code (or link) joins that group; `ADMIN_CODE` logs into the admin. On a fresh install the first admin-code entry creates the admin; if that person is already signed in, they're promoted. | No separate signup gate needed: having a group's code *is* the invitation. The promotion rule lets an existing user become admin without losing their votes. |
 | Visibility inside a group | Members can open each other's personal rankings of group lists | Comparing is the point ("¿en serio pusiste al Dinámico último?"). Private lists stay owner-only. |
 | Leaving a group | Your votes stay in the DB but stop counting for the group | Group rankings reflect current members; rejoining restores your input. |
 
@@ -168,7 +168,7 @@ browser (React SPA) ──fetch JSON──▶ Hono server (Node 24) ──▶ SQ
 ### 4.1 Data model
 
 ```
-users(id, username UNIQUE, display_name, password_hash, created_at)
+users(id, display_name UNIQUE NOCASE, is_admin, access_key_hash UNIQUE, created_at)
 sessions(token_hash PK, user_id, expires_at)          -- token stored hashed
 groups(id, name, emoji, invite_code UNIQUE, created_by, created_at)
 group_members(group_id, user_id, joined_at)           PK(group_id, user_id)
@@ -183,17 +183,24 @@ Archived items are dropped from every ranking and from duel selection, but their
 them.
 
 ### 4.2 Security
-- Passwords: `scrypt` (node:crypto) with per-user salt, constant-time compare.
-- Sessions: 32 random bytes in an `HttpOnly; SameSite=Lax` cookie (`Secure` in
-  production); only the SHA-256 of the token is stored, so a DB leak doesn't
-  leak live sessions. 30-day expiry.
+- No passwords. Identity = session cookie: 32 random bytes in an
+  `HttpOnly; SameSite=Lax` cookie (`Secure` in production). Only its SHA-256
+  is stored, so a DB leak doesn't leak live sessions. 1-year expiry, pushed back
+  at most once a day while in use.
+- Access keys (for access links): 32 random bytes, stored as SHA-256, shown
+  once. Issuing a new one invalidates the old. Anyone holding a person's link
+  *is* that person, so links are meant to be sent privately.
+- Group invite codes are 72 random bits. The admin code is compared in
+  constant time. Failed code/key guesses are limited to 10 per client IP per
+  15 min, and successes don't count (a group joining together isn't
+  throttled). Behind the proxy the client IP is the *last* `X-Forwarded-For`
+  entry (the one the proxy appended); earlier entries can be spoofed.
 - CSRF: SameSite=Lax + every mutating request must be `application/json`
   (forms can't send that cross-site without a CORS preflight, which we don't
   allow).
 - Authorization: every list/group route checks membership server-side. A
   private list is visible only to its owner. Votes must reference two distinct,
   non-archived items of the same list.
-- Login rate limit: in-memory per username+IP (fine for one process).
 - Item images are external URLs rendered with `referrerpolicy=no-referrer`.
   Only `http(s)` URLs are accepted.
 
@@ -238,12 +245,13 @@ them.
   model as weak pairwise evidence).
 - Public share links for a read-only ranking/tier image.
 - Single process + SQLite: no horizontal scaling. Fine for the target users.
-- Login rate limiting keys on username + client IP. Behind Railway's proxy the
-  IP is the proxy's, so in practice it's per-username: someone could lock a
-  friend out for 15 minutes by spamming wrong passwords. Acceptable for a
-  friend group; the fix is trusting `X-Forwarded-For` from the proxy.
-- No password reset (no email). A friend who forgets their password needs a
-  manual DB fix; an admin reset command would be the next step.
+- Whoever has a group's invite code can join it under a new name. If a code
+  leaks, regenerate it (group page). Names are first-come: someone could take
+  your friend's name first; the admin can rename them.
+- Losing your device *and* your access link means asking the admin. There's
+  no self-service recovery (that would need email).
+- Deleting a user hands their group lists, items and groups to the admin
+  (friends keep shared lists) but deletes their private lists and votes.
 
 ## 8. Decision log
 - 2026-10-06: Initial design (this document).
@@ -251,3 +259,7 @@ them.
 - 2026-10-06: Tiers switched from largest-gap cuts to Jenks natural breaks (§3.6).
 - 2026-10-06: Dropped `concurrently` (critical advisory in its `shell-quote`
   dependency) for a 10-line `scripts/dev.mjs`.
+- 2026-10-07: Replaced username/password accounts with code + name entry,
+  access links and a single admin (§2, §4.2). Migration v2 rebuilds `users`
+  keeping ids (votes and groups stay attached) and de-duplicates clashing
+  names. Tested on a synthetic v1 DB and on the owner's real local DB.

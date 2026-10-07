@@ -19,8 +19,14 @@ const app = createApp({
   db,
   // Behind Railway's TLS proxy in production; plain http locally.
   secureCookies: production,
-  signupCode: process.env.SIGNUP_CODE || undefined,
+  adminCode: process.env.ADMIN_CODE || (production ? undefined : 'admin'),
+  // Railway (and most PaaS) put a proxy in front; trust its X-Forwarded-For there.
+  trustProxy: process.env.TRUST_PROXY === '1' || production,
 });
+
+if (production && !process.env.ADMIN_CODE) {
+  console.warn('ADMIN_CODE is not set: nobody can log in as admin or create the first group.');
+}
 
 if (existsSync(clientDir)) {
   app.use('/assets/*', async (c, next) => {
