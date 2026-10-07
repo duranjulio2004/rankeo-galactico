@@ -25,6 +25,9 @@ in Chilean Spanish; code and docs are in English.
 | Tier lists | Auto-generated from the ranking (personal or group) by splitting the score scale at natural breaks | The tier list is a *view* of the ranking, not a second source of truth that can contradict it. Manual tier lists are listed under future work. |
 | Group insights | Agreement matrix (Kendall τ between members), "alma gemela" / "polo opuesto", most divisive items, per-member hot takes | This is what makes a group ranking a social thing instead of an average. |
 | Auth | Username + password, cookie sessions; groups joined via invite link | No email provider needed (would need a paid service/secrets); invite links are how friend groups actually share. |
+| Who can sign up | Open by default; if `SIGNUP_CODE` is set, registering needs that code **or** any valid group invite code | A public URL shouldn't let strangers in, but "here's the invite link" must still be enough for a friend to join. |
+| Visibility inside a group | Members can open each other's personal rankings of group lists | Comparing is the point ("¿en serio pusiste al Dinámico último?"). Private lists stay owner-only. |
+| Leaving a group | Your votes stay in the DB but stop counting for the group | Group rankings reflect current members; rejoining restores your input. |
 
 ## 3. Ranking engine (the core)
 
@@ -194,7 +197,7 @@ them.
 - [x] **M1 Ranking engine.** BT fit, uncertainty, confidence, pair selection,
   group weighting, agreement/divisive/hot takes, tiers. Unit tests incl.
   recovery of a hidden true order from simulated noisy voters.
-- [ ] **M2 Backend.** Schema, auth, groups + invites, lists, items, votes,
+- [x] **M2 Backend.** Schema, auth, groups + invites, lists, items, votes,
   undo, exclusions, ranking endpoints. API tests against an in-memory DB.
 - [ ] **M3 Frontend core.** Auth, home, create list (paste items), duel
   screen (keyboard, undo, tie/skip/exclude, confidence bar), personal ranking.
