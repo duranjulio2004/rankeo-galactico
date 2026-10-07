@@ -22,7 +22,7 @@ in Chilean Spanish; code and docs are in English.
 | Undo | Undo last vote, any number of times | Misclicks happen at duel speed; without undo, people stop trusting their ranking. |
 | Personal vs group | Every list is either private (owner only) or belongs to a group. Everyone who duels on a group list has a personal ranking of it; the group ranking aggregates members. | Both are first-class without two separate list types. A group list needs no extra setup: members just start dueling. |
 | Who edits a group list | Any member can add items; creator can rename/archive items | Friend groups are high-trust; collecting items together is part of the fun. Archiving (not deleting) keeps past votes meaningful. |
-| Tier lists | Auto-generated from the ranking (personal or group) by splitting the score scale at natural gaps | The tier list is a *view* of the ranking, not a second source of truth that can contradict it. Manual tier lists are listed under future work. |
+| Tier lists | Auto-generated from the ranking (personal or group) by splitting the score scale at natural breaks | The tier list is a *view* of the ranking, not a second source of truth that can contradict it. Manual tier lists are listed under future work. |
 | Group insights | Agreement matrix (Kendall τ between members), "alma gemela" / "polo opuesto", most divisive items, per-member hot takes | This is what makes a group ranking a social thing instead of an average. |
 | Auth | Username + password, cookie sessions; groups joined via invite link | No email provider needed (would need a paid service/secrets); invite links are how friend groups actually share. |
 
@@ -82,6 +82,20 @@ appearance ("cold start"): until every item has been seen at least once, one
 side of each duel is an unseen item. With n ≤ 300 items, scoring all n²/2
 pairs per request is ~45k evaluations, which is negligible.
 
+**Measured** (simulated voter with a hidden true order, 20 items, 20 seeds,
+`test/ranking.test.ts`). τ is Kendall's correlation with the truth:
+
+| voter | duels | active τ | random τ |
+|---|---|---|---|
+| consistent (Δθ = 1 per rank) | 40 | 0.77 | 0.68 |
+| consistent | 60 | 0.87 | 0.76 |
+| consistent | 100 | 0.93 | 0.84 |
+| very noisy (Δθ = 0.3 per rank) | 100 | 0.78 | 0.76 |
+
+For a consistent voter, 60 active duels beat 100 random ones (about 40% fewer clicks).
+Prior strength (0.25–2 virtual games) changed τ by < 0.02. I kept 1 because
+it better resists "one lucky win puts a new item at #1".
+
 ### 3.4 Group ranking
 The group ranking is one Bradley–Terry fit over **all members' votes**, with
 each member's votes weighted `wᵤ = min(1, M / nᵤ)` where *nᵤ* is that member's
@@ -108,10 +122,16 @@ vote count on the list and *M* is the median count among members who voted.
   most from the group percentile.
 
 ### 3.6 Tiers
-Sort by θ, then split at the largest gaps between consecutive scores
-(at most 6 tiers S/A/B/C/D/F, each gap must be meaningfully larger than the
-median gap). Gap-splitting follows the actual shape of the data. Fixed
-percentiles would put two near-identical items in different tiers.
+Sort by θ, then partition the scores with **Jenks natural breaks** (optimal
+1-D clustering by dynamic programming, O(k·n²)). The number of tiers is the
+smallest k ≤ 6 whose goodness-of-variance-fit reaches 0.85. If the score
+range is under 0.2 (e.g. no votes yet), everything is one tier. Tiers are
+labelled S, A, B… in order.
+
+I first planned "cut at the largest gaps", but it degenerates on noisy data:
+it isolates single outliers and leaves one huge middle tier. Jenks minimizes
+within-tier spread globally. Fixed percentiles were rejected because they put
+two near-identical items in different tiers.
 
 ## 4. Architecture
 
@@ -171,7 +191,7 @@ them.
 ## 5. Milestones
 
 - [x] **M0 Scaffold.** Repo, DESIGN, README, tooling, test runner.
-- [ ] **M1 Ranking engine.** BT fit, uncertainty, confidence, pair selection,
+- [x] **M1 Ranking engine.** BT fit, uncertainty, confidence, pair selection,
   group weighting, agreement/divisive/hot takes, tiers. Unit tests incl.
   recovery of a hidden true order from simulated noisy voters.
 - [ ] **M2 Backend.** Schema, auth, groups + invites, lists, items, votes,
@@ -204,3 +224,6 @@ them.
 
 ## 8. Decision log
 - 2026-10-06: Initial design (this document).
+- 2026-10-06: Tiers switched from largest-gap cuts to Jenks natural breaks (§3.6).
+- 2026-10-06: Dropped `concurrently` (critical advisory in its `shell-quote`
+  dependency) for a 10-line `scripts/dev.mjs`.
